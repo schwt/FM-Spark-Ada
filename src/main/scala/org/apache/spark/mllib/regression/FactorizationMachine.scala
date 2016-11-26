@@ -6,7 +6,7 @@ import org.json4s.jackson.JsonMethods._
 
 import scala.util.Random
 
-import org.apache.spark.{SparkContext, Logging}
+import org.apache.spark.{SparkContext}
 import org.apache.spark.mllib.linalg._
 import org.apache.spark.mllib.optimization.{Updater, Gradient}
 import org.apache.spark.rdd.RDD
@@ -55,7 +55,7 @@ class FMModel(val task: Int,
           sum += d
           sumSqr += d * d
       }
-      pred += (sum * sum - sumSqr) / 2
+      pred += (sum * sum - sumSqr) * 0.5
     }
 
     task match {
@@ -107,7 +107,7 @@ object FMModel extends Loader[FMModel] {
 
       // Create Parquet data.
       val dataRDD: DataFrame = sc.parallelize(Seq(data), 1).toDF()
-      dataRDD.saveAsParquetFile(dataPath(path))
+	dataRDD.write.parquet(dataPath(path))
     }
 
     def load(sc: SparkContext, path: String): FMModel = {
@@ -189,7 +189,7 @@ class FMGradient(val task: Int, val k0: Boolean, val k1: Boolean, val k2: Int,
           sum(f) += d
           sumSqr += d * d
       }
-      pred += (sum(f) * sum(f) - sumSqr) / 2
+      pred += (sum(f) * sum(f) - sumSqr) * 0.5
     }
 
     if (task == 0) {
@@ -296,6 +296,6 @@ class FMUpdater(val k0: Boolean, val k1: Boolean, val k2: Int,
       regVal += r2 * weightsNew(i) * weightsNew(i)
     }
 
-    (Vectors.dense(weightsNew), regVal / 2)
+    (Vectors.dense(weightsNew), regVal * 0.5)
   }
 }

@@ -1,6 +1,5 @@
 package org.apache.spark.mllib.regression
 
-import org.apache.spark.Logging
 import org.apache.spark.mllib.linalg.{DenseMatrix, Vectors, Vector}
 import org.apache.spark.mllib.optimization.LBFGS
 import org.apache.spark.rdd.RDD
@@ -55,7 +54,7 @@ class FMWithLBFGS(private var task: Int,
                   private var numIterations: Int,
                   private var numCorrections: Int,
                   private var dim: (Boolean, Boolean, Int),
-                  private var regParam: (Double, Double, Double)) extends Serializable with Logging {
+                  private var regParam: (Double, Double, Double)) extends Serializable {
 
   private var k0: Boolean = dim._1
   private var k1: Boolean = dim._2
@@ -188,8 +187,8 @@ class FMWithLBFGS(private var task: Int,
   def run(input: RDD[LabeledPoint]): FMModel = {
 
     if (input.getStorageLevel == StorageLevel.NONE) {
-      logWarning("The input data is not directly cached, which may hurt performance if its"
-        + " parent RDDs are also uncached.")
+//      logWarning("The input data is not directly cached, which may hurt performance if its"
+ //       + " parent RDDs are also uncached.")
     }
 
     this.numFeatures = input.first().features.size

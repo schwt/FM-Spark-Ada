@@ -1,32 +1,31 @@
-
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.mllib.regression._
 import org.apache.spark.mllib.util.MLUtils
+import org.apache.spark.rdd.RDD
 
 
-/**
- * Created by zrf on 4/18/15.
- */
 
-
-object TestFM extends App {
+object TestLibFM extends App {
 
   override def main(args: Array[String]): Unit = {
 
-    val sc = new SparkContext(new SparkConf().setAppName("TESTFM"))
+    val sparkConf = new SparkConf().setAppName("TESTLIBFM").setMaster("local[4]")
+    val sc = new SparkContext(sparkConf)
 
-    //    "hdfs://ns1/whale-tmp/url_combined"
-    val training = MLUtils.loadLibSVMFile(sc, "hdfs://ns1/whale-tmp/url_combined").cache()
-
+    val training = MLUtils.loadLibSVMFile(sc, "data/a9a").cache()
+    val testing = MLUtils.loadLibSVMFile(sc, "data/a9a.t")
     //    val task = args(1).toInt
     //    val numIterations = args(2).toInt
     //    val stepSize = args(3).toDouble
     //    val miniBatchFraction = args(4).toDouble
+    val currentTime = System.currentTimeMillis()
+    val fm1 = FMWithAda.train(training, task = 1, numIterations = 50, stepSize = 0.01, miniBatchFraction = 1.0, dim = (true, true, 8), regParam = (0, 0.0, 0.01), initStd = 0.01)
+    val elapsedTime = System.currentTimeMillis() - currentTime
 
-    val fm1 = FMWithSGD.train(training, task = 1, numIterations = 100, stepSize = 0.15, miniBatchFraction = 1.0, dim = (true, true, 4), regParam = (0, 0, 0), initStd = 0.1)
+    val scores: RDD[(Int, Int)] = fm1.predict(testing.map(_.features)).map(x => if(x >= 0.5) 1 else -1).zip(testing.map(_.label.toInt))
+    val accuracy = scores.filter(x => x._1 == x._2).count().toDouble / scores.count()
 
-
-    val fm2 = FMWithLBFGS.train(training, task = 1, numIterations = 20, numCorrections = 5, dim = (true, true, 4), regParam = (0, 0, 0), initStd = 0.1)
-    
+    println(s"Accuracy = $accuracy, time elapsed: $elapsedTime millisecond.")
+    sc.stop()
   }
 }
