@@ -1,17 +1,13 @@
 package org.apache.spark.mllib.regression
 
-import org.apache.spark.mllib.linalg.{DenseMatrix, Vectors, Vector}
-import org.apache.spark.mllib.optimization.GradientDescent
+import org.apache.spark.mllib.linalg.{DenseMatrix, Vector, Vectors}
+import org.apache.spark.mllib.optimization.{AdaGradientDescent, AdamUpdater, GradientDescent}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 
 import scala.util.Random
 
-/**
-  * Created by zrf on 4/24/15.
-  */
-
-object FMWithSGD {
+object FMWithAda {
   /**
     * Train a Factoriaton Machine Regression model given an RDD of (label, features) pairs. We run a fixed number
     * of iterations of gradient descent using the specified step size. Each iteration uses
@@ -39,7 +35,7 @@ object FMWithSGD {
             dim: (Boolean, Boolean, Int),
             regParam: (Double, Double, Double),
             initStd: Double): FMModel = {
-    new FMWithSGD(task, stepSize, numIterations, dim, regParam, miniBatchFraction)
+    new FMWithAda(task, stepSize, numIterations, dim, regParam, miniBatchFraction)
       .setInitStd(initStd)
       .run(input)
   }
@@ -47,14 +43,14 @@ object FMWithSGD {
   def train(input: RDD[LabeledPoint],
             task: Int,
             numIterations: Int): FMModel = {
-    new FMWithSGD(task, 1.0, numIterations, (true, true, 8), (0, 1e-3, 1e-4), 1e-5)
+    new FMWithAda(task, 1.0, numIterations, (true, true, 8), (0, 1e-3, 1e-4), 1e-5)
       .setInitStd(0.01)
       .run(input)
   }
 }
 
 
-class FMWithSGD(private var task: Int,
+class FMWithAda(private var task: Int,
                 private var stepSize: Double,
                 private var numIterations: Int,
                 private var dim: (Boolean, Boolean, Int),
@@ -138,7 +134,7 @@ class FMWithSGD(private var task: Int,
   }
 
   /**
-    * Set fraction of data to be used for each SGD iteration.
+    * Set fraction of data to be used for each iteration.
     */
   def setMiniBatchFraction(miniBatchFraction: Double): this.type = {
     require(miniBatchFraction > 0 && miniBatchFraction <= 1)
@@ -147,7 +143,7 @@ class FMWithSGD(private var task: Int,
   }
 
   /**
-    * Set the number of iterations for SGD.
+    * Set the number of iterations.
     */
   def setNumIterations(numIterations: Int): this.type = {
     require(numIterations > 0)
@@ -156,7 +152,7 @@ class FMWithSGD(private var task: Int,
   }
 
   /**
-    * Set the initial step size of SGD for the first step.
+    * Set the initial step size for the first step.
     * In subsequent steps, the step size will decrease with stepSize/sqrt(t)
     */
   def setStepSize(stepSize: Double): this.type = {
@@ -234,13 +230,12 @@ class FMWithSGD(private var task: Int,
 
     val gradient = new FMGradient(task, k0, k1, k2, numFeatures, minLabel, maxLabel)
 
-    val updater = new FMUpdater(k0, k1, k2, r0, r1, r2, numFeatures)
+    val updater = new AdamUpdater()
 
-    val optimizer = new GradientDescent(gradient, updater)
+    val optimizer = new AdaGradientDescent(gradient, updater)
       .setStepSize(stepSize)
       .setNumIterations(numIterations)
       .setMiniBatchFraction(miniBatchFraction)
-      .setConvergenceTol(Double.MinPositiveValue)
 
     val data = task match {
       case 0 =>
