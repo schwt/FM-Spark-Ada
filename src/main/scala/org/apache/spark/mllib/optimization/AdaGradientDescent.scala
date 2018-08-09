@@ -20,13 +20,14 @@ package org.apache.spark.mllib.optimization
 import breeze.linalg.{norm, DenseVector => BDV}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.internal.Logging
+// import org.apache.spark.Logging
 import org.apache.spark.mllib.linalg.{DenseVector, Vector, Vectors}
 import org.apache.spark.rdd.RDD
 
 import scala.collection.mutable.ArrayBuffer
 
 /**
- * Class used to solve an optimization problem using Gradient Descent.
+  * Class used to solve an optimization problem using Gradient Descent.
   *
   * @param gradient Gradient function to be used.
   * @param updater Updater to be used to update weights after every iteration.
@@ -149,9 +150,9 @@ class AdaGradientDescent private[spark] (
 }
 
 /**
- * :: DeveloperApi ::
- * Top-level method to run gradient descent.
- */
+  * :: DeveloperApi ::
+  * Top-level method to run gradient descent.
+  */
 @DeveloperApi
 object AdaGradientDescent extends Logging {
   /**
@@ -179,15 +180,15 @@ object AdaGradientDescent extends Logging {
     *         stochastic loss computed for every iteration.
     */
   def runMiniBatch(
-                       data: RDD[(Double, Vector)],
-                       gradient: Gradient,
-                       updater: AdaUpdater,
-                       learningRate: Double,
-                       numIterations: Int,
-                       regParam: Double,
-                       miniBatchFraction: Double,
-                       initialWeights: Vector,
-                       convergenceTol: Double): (Vector, Array[Double]) = {
+                    data: RDD[(Double, Vector)],
+                    gradient: Gradient,
+                    updater: AdaUpdater,
+                    learningRate: Double,
+                    numIterations: Int,
+                    regParam: Double,
+                    miniBatchFraction: Double,
+                    initialWeights: Vector,
+                    convergenceTol: Double): (Vector, Array[Double]) = {
 
     // convergenceTol should be set with non minibatch settings
     if (miniBatchFraction < 1.0 && convergenceTol > 0.0) {
@@ -232,6 +233,7 @@ object AdaGradientDescent extends Logging {
     var converged = false // indicates whether converged based on convergenceTol
     var i = 1
 
+    println("training logloss (wyb):")
     while (!converged && i <= numIterations) {
       val bcWeights = data.context.broadcast(weights)
       // Sample a subset (fraction miniBatchFraction) of the total data
@@ -284,6 +286,7 @@ object AdaGradientDescent extends Logging {
       } else {
         logWarning(s"Iteration ($i/$numIterations). The size of sampled batch is zero")
       }
+      println(f"iteration [$i]: ${(lossSum/miniBatchSize).formatted("%.10f")}")
       i += 1
     }
 
@@ -298,14 +301,14 @@ object AdaGradientDescent extends Logging {
     * Alias of [[runMiniBatch]] with convergenceTol set to default value of 0.001.
     */
   def runMiniBatch(
-                       data: RDD[(Double, Vector)],
-                       gradient: Gradient,
-                       updater: AdaUpdater,
-                       learningRate: Double,
-                       numIterations: Int,
-                       regParam: Double,
-                       miniBatchFraction: Double,
-                       initialWeights: Vector): (Vector, Array[Double]) =
+                    data: RDD[(Double, Vector)],
+                    gradient: Gradient,
+                    updater: AdaUpdater,
+                    learningRate: Double,
+                    numIterations: Int,
+                    regParam: Double,
+                    miniBatchFraction: Double,
+                    initialWeights: Vector): (Vector, Array[Double]) =
     AdaGradientDescent.runMiniBatch(data, gradient, updater, learningRate, numIterations,
       regParam, miniBatchFraction, initialWeights, 0.001)
 
