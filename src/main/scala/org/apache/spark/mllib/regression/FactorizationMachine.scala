@@ -1,14 +1,19 @@
 package org.apache.spark.mllib.regression
 
+
+import java.io
+import java.io.{DataOutputStream, FileOutputStream, FileWriter}
+
+import scala.collection.mutable.ArrayBuffer
+//import breeze.io.TextWriter.FileWriter
 import org.json4s.DefaultFormats
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
 
 import scala.util.Random
-
-import org.apache.spark.{SparkContext}
+import org.apache.spark.SparkContext
 import org.apache.spark.mllib.linalg._
-import org.apache.spark.mllib.optimization.{Updater, Gradient}
+import org.apache.spark.mllib.optimization.{Gradient, Updater}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.mllib.util.Loader._
@@ -81,6 +86,56 @@ class FMModel(val task: Int,
     val data = FMModel.SaveLoadV1_0.Data(factorMatrix, weightVector, intercept, min, max, task)
     FMModel.SaveLoadV1_0.save(sc, path, data)
   }
+
+  // added by wyb on 2017.2.8
+  def mySaveText(path: String, set_effect_fid:Set[Int]): Unit = {
+    val wf = new FileWriter(path)
+    wf.write(f"$numFeatures $numFactors $intercept\n")
+
+    for (fid <- 0 until numFeatures if set_effect_fid.contains(fid+1)) {
+      val w = f"${fid+1} ${weightVector.get(fid)} "
+      val v = 0.until(numFactors).map(k => f"${factorMatrix(k, fid)}").mkString(" ")
+      wf.write(w + v + "\n")
+    }
+    wf.close()
+  }
+
+  // fid 为原始值,没有修正。输出所有特征。
+  def mySave(path: String): Unit = {
+    val wf = new FileWriter(path)
+    wf.write(f"$numFeatures $numFactors $intercept\n")
+
+    for (fid <- 0 until numFeatures) {
+      val w = f"${fid} ${weightVector.get(fid)} "
+      val v = 0.until(numFactors).map(k => f"${factorMatrix(k, fid)}").mkString(" ")
+      wf.write(w + v + "\n")
+    }
+    wf.close()
+  }
+
+  def mySaveHdfs(sc: SparkContext, path: String, featureIdSet: List[Int]): Unit = {
+
+    val data = ArrayBuffer[String]()
+    data += f"-1 ${intercept}"
+    for (fid <- featureIdSet) {
+      val w = weightVector.get(fid).formatted("%.8f")
+      val strV = 0.until(numFactors).map(k => f"${factorMatrix(k, fid).formatted("%.8f")}").mkString(" ")
+      data += f"${fid+1} ${w} ${strV}"
+    }
+    val rdd = sc.parallelize(data)
+    rdd.saveAsTextFile(path)
+  }
+
+  def mySaveBinary(path: String, set_effect_fid:Set[Int]): Unit = {
+    val wf = new DataOutputStream(new FileOutputStream(path))
+    for (fid <- 0 until numFeatures if set_effect_fid.contains(fid+1)) {
+      wf.writeInt(fid+1)
+      wf.writeDouble(weightVector.get(fid))
+      0.until(numFactors).foreach{k => wf.writeDouble(factorMatrix(k, fid))}
+      wf.writeInt(-1)
+    }
+    wf.close()
+  }
 }
 
 object FMModel extends Loader[FMModel] {
@@ -107,7 +162,7 @@ object FMModel extends Loader[FMModel] {
 
       // Create Parquet data.
       val dataRDD: DataFrame = sc.parallelize(Seq(data), 1).toDF()
-	dataRDD.write.parquet(dataPath(path))
+      dataRDD.write.parquet(dataPath(path))
     }
 
     def load(sc: SparkContext, path: String): FMModel = {
